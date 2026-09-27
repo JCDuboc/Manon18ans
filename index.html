@@ -212,7 +212,7 @@ code{background:#f5ecd0;padding:2px 6px;border-radius:6px}
     <div class="actions" style="margin-top:14px">
       <button class="btn bordeaux" type="button" onclick="exporterCSV()">⬇️ Exporter CSV</button>
       <button class="btn ghost" type="button" onclick="afficher()">🔄 Actualiser</button>
-      <button class="btn ghost" type="button" onclick="reinitialiserChoix()">🗑️ Remettre à zéro</button>
+      <button class="btn ghost" type="button" onclick="ouvrirPopupRaz()">🗑️ Remettre à zéro</button>
       <button class="btn ghost" type="button" onclick="retourAccueil()">← Retour</button>
     </div>
     <p class="small">Page réservée à l'organisateur.</p>
@@ -230,6 +230,30 @@ code{background:#f5ecd0;padding:2px 6px;border-radius:6px}
     <div class="actions" style="justify-content:center">
       <button class="btn bordeaux" type="button" onclick="verifierCode()">Valider</button>
       <button class="btn ghost" type="button" onclick="fermerPopup()">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<!-- Popup confirmation remise à zéro -->
+<div class="modal cachee" id="popup-raz">
+  <div class="modal-box">
+    <h3>🗑️ Remettre à zéro ?</h3>
+    <p class="small">Tous les choix enregistrés (tous appareils) seront définitivement effacés. Continuer ?</p>
+    <div class="actions" style="justify-content:center">
+      <button class="btn bordeaux" type="button" onclick="confirmerRaz()">Oui, tout effacer</button>
+      <button class="btn ghost" type="button" onclick="fermerPopupRaz()">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<!-- Popup confirmation suppression d'un invité -->
+<div class="modal cachee" id="popup-suppr">
+  <div class="modal-box">
+    <h3>✕ Supprimer ce choix ?</h3>
+    <p class="small">Effacer définitivement le menu de <b id="suppr-nom"></b> ?</p>
+    <div class="actions" style="justify-content:center">
+      <button class="btn bordeaux" type="button" onclick="confirmerSuppr()">Oui, supprimer</button>
+      <button class="btn ghost" type="button" onclick="fermerPopupSuppr()">Annuler</button>
     </div>
   </div>
 </div>
@@ -423,7 +447,7 @@ function dessiner(data){
   document.getElementById('synth-desserts').innerHTML=synthese(CONFIG.desserts,'dessert');
   document.getElementById('tableau').innerHTML=noms.map(n=>{
     const r=data[n];
-    return `<tr><td><b>${n}</b><br><span class="small">${r.date||''}</span></td><td>${r.entree}</td><td>${r.plat}</td><td>${r.dessert}</td><td>${(r.commentaire||'').replace(/</g,'&lt;')}</td><td><button onclick="supprimer('${n.replace(/'/g,"\\'")}')">✕</button></td></tr>`;
+    return `<tr><td><b>${n}</b><br><span class="small">${r.date||''}</span></td><td>${r.entree}</td><td>${r.plat}</td><td>${r.dessert}</td><td>${(r.commentaire||'').replace(/</g,'&lt;')}</td><td><button onclick="ouvrirPopupSuppr('${n.replace(/'/g,"\\'")}')">✕</button></td></tr>`;
   }).join('') || `<tr><td colspan="6" style="text-align:center">Aucune réponse pour l'instant.</td></tr>`;
 }
 
@@ -448,15 +472,32 @@ function supprimer(n){
   supprimerDistant(n).catch(()=>{});
   dessiner(d);
 }
-function reinitialiserChoix(){
-  if(confirm('Remettre à zéro tous les choix enregistrés (tous appareils) ? Cette action est définitive.')){
-    localStorage.removeItem(KEY);
-    window._toutes={};
-    razDistant().catch(()=>{});
-    dessiner({});
-    statut(urlBase()?'Base centrale vidée.':'Réponses locales effacées.');
-  }
+window._supprEnCours=null;
+function ouvrirPopupSuppr(n){
+  window._supprEnCours=n;
+  document.getElementById('suppr-nom').textContent=n;
+  document.getElementById('popup-suppr').classList.remove('cachee');
 }
+function fermerPopupSuppr(){
+  window._supprEnCours=null;
+  document.getElementById('popup-suppr').classList.add('cachee');
+}
+function confirmerSuppr(){
+  const n=window._supprEnCours;
+  fermerPopupSuppr();
+  if(n)supprimer(n);
+}
+function ouvrirPopupRaz(){document.getElementById('popup-raz').classList.remove('cachee');}
+function fermerPopupRaz(){document.getElementById('popup-raz').classList.add('cachee');}
+function confirmerRaz(){
+  fermerPopupRaz();
+  localStorage.removeItem(KEY);
+  window._toutes={};
+  razDistant().catch(()=>{});
+  dessiner({});
+  statut(urlBase()?'Base centrale vidée.':'Réponses locales effacées.');
+}
+function reinitialiserChoix(){ouvrirPopupRaz();}
 const CODE_SYNTHESE = "Crumble";
 function ouvrirPopupSynthese(){
   document.getElementById('popup-code').classList.remove('cachee');
@@ -479,6 +520,8 @@ function verifierCode(){
 }
 document.getElementById('code-input').addEventListener('keydown',e=>{if(e.key==='Enter')verifierCode();});
 document.getElementById('popup-code').addEventListener('click',e=>{if(e.target.id==='popup-code')fermerPopup();});
+document.getElementById('popup-raz').addEventListener('click',e=>{if(e.target.id==='popup-raz')fermerPopupRaz();});
+document.getElementById('popup-suppr').addEventListener('click',e=>{if(e.target.id==='popup-suppr')fermerPopupSuppr();});
 function retourAccueil(){
   document.getElementById('page-synthese').classList.add('cachee');
   document.getElementById('page-invites').classList.remove('cachee');
