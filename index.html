@@ -201,6 +201,7 @@ code{background:#f5ecd0;padding:2px 6px;border-radius:6px}
   <section class="card" id="synthese">
     <h2>Synthèse des Choix</h2>
     <p style="text-align:center"><span id="total-reponses">0</span> réponse(s) enregistrée(s)</p>
+    <p class="small" id="statut-sync" style="text-align:center"></p>
     <div class="synthese">
       <div class="synth-card"><h3>🥗 Entrées</h3><div id="synth-entrees"></div></div>
       <div class="synth-card"><h3>🍖 Plats</h3><div id="synth-plats"></div></div>
@@ -216,6 +217,7 @@ code{background:#f5ecd0;padding:2px 6px;border-radius:6px}
     </div>
     <div class="actions" style="margin-top:14px">
       <button class="btn bordeaux" type="button" onclick="exporterCSV()">⬇️ Exporter CSV</button>
+      <button class="btn ghost" type="button" onclick="afficher()">🔄 Actualiser</button>
       <button class="btn ghost" type="button" onclick="reinitialiserChoix()">🗑️ Remettre à zéro</button>
       <button class="btn ghost" type="button" onclick="retourAccueil()">← Retour</button>
     </div>
@@ -265,7 +267,12 @@ const CONFIG = {
     {t:"LA CRÈME BRÛLÉE", d:"version pommes caramélisées au cidre et baies de cassis"},
     {t:"LE CHOCOLAT 64 %", d:"mi-cuit au beurre salé, cœur de praliné noisette"}
   ],
-  invites: ["Anne","Antoine","Antonio","Caroline","Filipe","G6","Jean-Christophe","Jérôme","Louise","Lucas","Manon","Maria","Martine","Melvina","Sophie","Suzette","Thierry","Valérie"]
+  invites: ["Anne","Antoine","Antonio","Caroline","Filipe","G6","Jean-Christophe","Jérôme","Louise","Lucas","Manon","Maria","Martine","Melvina","Sophie","Suzette","Thierry","Valérie"],
+  // Base centrale (sinon chaque appareil ne voit que ses propres choix).
+  // Collez ici l'URL de votre base Firebase Realtime Database, ex :
+  // "https://mon-projet-default-rtdb.europe-west1.firebasedatabase.app"
+  // Laisser "" = mode local uniquement.
+  backendUrl: "https://ans-manon-default-rtdb.europe-west1.firebasedatabase.app"
 };
 // ================================================================
 
@@ -324,11 +331,41 @@ radioList('liste-desserts',CONFIG.desserts,'dessert');
 const sel=document.getElementById('invite');
 sel.innerHTML = `<option value="" disabled selected>Choisissez votre nom dans la liste</option>` + CONFIG.invites.map(n=>`<option value="${n}">${n}</option>`).join('');
 
-// Stockage
-const KEY='choix-18ans-v2';
+// Stockage local (secours hors-ligne)
+const KEY='choix-18-ans-v2';
 function charger(){try{return JSON.parse(localStorage.getItem(KEY))||{}}catch{return{}}}
 function sauver(d){localStorage.setItem(KEY,JSON.stringify(d))}
 function getChecked(name){const e=document.querySelector(`input[name="${name}"]:checked`);return e?e.value:''}
+
+// ---- Base centrale (Firebase Realtime Database via REST) ----
+function urlBase(){return (CONFIG.backendUrl||'').replace(/\/+$/,'');}
+function statut(txt){const el=document.getElementById('statut-sync');if(el)el.textContent=txt;}
+async function chargerDistant(){
+  const base=urlBase();if(!base)return {};
+  const r=await fetch(base+'/menus.json');
+  if(!r.ok)throw new Error('Lecture distante impossible');
+  return (await r.json())||{};
+}
+async function envoyerDistant(invite,obj){
+  const base=urlBase();if(!base)return;
+  await fetch(base+'/menus/'+encodeURIComponent(invite)+'.json',{method:'PUT',body:JSON.stringify(obj)});
+}
+async function supprimerDistant(invite){
+  const base=urlBase();if(!base)return;
+  await fetch(base+'/menus/'+encodeURIComponent(invite)+'.json',{method:'DELETE'});
+}
+async function razDistant(){
+  const base=urlBase();if(!base)return;
+  await fetch(base+'/menus.json',{method:'DELETE'});
+}
+// Données fusionnées (distant prioritaire) utilisées pour l'affichage et l'export
+window._toutes={};
+function fusionner(local,distant){
+  const m=Object.assign({},local,distant);
+  window._toutes=m;
+  try{sauver(m);}catch(e){}
+  return m;
+}
 
 function enregistrerChoix(e){
   e.preventDefault();
@@ -340,7 +377,13 @@ function enregistrerChoix(e){
   const data=charger();
   data[invite]={entree,plat,dessert,commentaire,date:new Date().toLocaleString('fr-FR')};
   sauver(data);
-  document.getElementById('message').textContent=`Merci ${invite} ! Ton menu a bien été enregistré ✓`;
+  window._toutes=data;
+  if(urlBase()){
+    envoyerDistant(invite,data[invite]).catch(()=>{});
+    document.getElementById('message').textContent=`Merci ${invite} ! Ton menu a bien été enregistré et centralisé ✓`;
+  } else {
+    document.getElementById('message').textContent=`Merci ${invite} ! Ton menu a bien été enregistré ✓`;
+  }
   document.getElementById('form-menu').reset();
   afficher();
   document.getElementById('message').scrollIntoView({behavior:'smooth',block:'center'});
@@ -368,7 +411,7 @@ sel.addEventListener('change',()=>{
 });
 
 function synthese(liste, cle){
-  const data=Object.values(charger());
+  const data=Object.values(window._toutes||{});
   const total=data.length||1;
   return liste.map(item=>{
     const t=titrePlat(item);
@@ -378,8 +421,7 @@ function synthese(liste, cle){
   }).join('');
 }
 
-function afficher(){
-  const data=charger();
+function dessiner(data){
   const noms=Object.keys(data);
   document.getElementById('total-reponses').textContent=noms.length;
   document.getElementById('synth-entrees').innerHTML=synthese(CONFIG.entrees,'entree');
@@ -390,11 +432,35 @@ function afficher(){
     return `<tr><td><b>${n}</b><br><span class="small">${r.date||''}</span></td><td>${r.entree}</td><td>${r.plat}</td><td>${r.dessert}</td><td>${(r.commentaire||'').replace(/</g,'&lt;')}</td><td><button onclick="supprimer('${n.replace(/'/g,"\\'")}')">✕</button></td></tr>`;
   }).join('') || `<tr><td colspan="6" style="text-align:center">Aucune réponse pour l'instant.</td></tr>`;
 }
-function supprimer(n){const d=charger();delete d[n];sauver(d);afficher();}
+
+async function afficher(){
+  const local=charger();
+  window._toutes=local;
+  dessiner(local);
+  if(!urlBase()){statut('Mode local : renseignez backendUrl dans CONFIG pour centraliser les réponses.');return;}
+  statut('Synchronisation…');
+  try{
+    const distant=await chargerDistant();
+    const m=fusionner(local,distant);
+    dessiner(m);
+    statut('Centralisé ✓ — visibles depuis tous les appareils ('+Object.keys(m).length+' réponse(s)).');
+  }catch(e){
+    statut('Hors-ligne : affichage des choix de cet appareil uniquement.');
+  }
+}
+function supprimer(n){
+  const d=Object.assign({},window._toutes);delete d[n];
+  window._toutes=d;sauver(d);
+  supprimerDistant(n).catch(()=>{});
+  dessiner(d);
+}
 function reinitialiserChoix(){
-  if(confirm('Remettre à zéro tous les choix enregistrés ? Cette action est définitive.')){
+  if(confirm('Remettre à zéro tous les choix enregistrés (tous appareils) ? Cette action est définitive.')){
     localStorage.removeItem(KEY);
-    afficher();
+    window._toutes={};
+    razDistant().catch(()=>{});
+    dessiner({});
+    statut(urlBase()?'Base centrale vidée.':'Réponses locales effacées.');
   }
 }
 const CODE_SYNTHESE = ""; // code à blanc pour le moment (remettre "Crumble" pour protéger)
@@ -425,7 +491,7 @@ function retourAccueil(){
   window.scrollTo({top:0,behavior:'smooth'});
 }
 function exporterCSV(){
-  const d=charger();const rows=[['Invite','Entree','Plat','Dessert','Commentaire','Date']];
+  const d=window._toutes||charger();const rows=[['Invite','Entree','Plat','Dessert','Commentaire','Date']];
   for(const n in d)rows.push([n,d[n].entree,d[n].plat,d[n].dessert,(d[n].commentaire||'').replace(/;/g,','),d[n].date||'']);
   const csv=rows.map(r=>r.map(c=>`"${c}"`).join(';')).join('\n');
   const a=document.createElement('a');
