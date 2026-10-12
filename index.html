@@ -260,6 +260,7 @@ code{background:#f5ecd0;padding:2px 6px;border-radius:6px}
     <p class="small" id="photos-statut" style="text-align:center"></p>
     <div class="actions" style="justify-content:center">
       <button class="btn ghost" type="button" onclick="chargerPhotos()">🔄 Actualiser</button>
+      <button class="btn ghost" type="button" onclick="ouvrirPopupSupprPhotos()">🗑️ Supprimer la sélection</button>
       <button class="btn ghost" type="button" onclick="retourAccueil()">← Retour</button>
     </div>
   </section>
@@ -300,6 +301,32 @@ code{background:#f5ecd0;padding:2px 6px;border-radius:6px}
     <div class="actions" style="justify-content:center">
       <button class="btn bordeaux" type="button" onclick="confirmerSuppr()">Oui, supprimer</button>
       <button class="btn ghost" type="button" onclick="fermerPopupSuppr()">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<!-- Popup mot de passe suppression photos -->
+<div class="modal cachee" id="popup-mp-photos">
+  <div class="modal-box">
+    <h3>🔒 Supprimer des photos</h3>
+    <p class="small">Saisissez le code organisateur pour continuer.</p>
+    <input type="password" id="mp-photos-input" placeholder="Code" autocomplete="off">
+    <p class="erreur" id="mp-photos-erreur"></p>
+    <div class="actions" style="justify-content:center">
+      <button class="btn bordeaux" type="button" onclick="verifierCodeSupprPhotos()">Valider</button>
+      <button class="btn ghost" type="button" onclick="fermerPopupMpPhotos()">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<!-- Popup double confirmation suppression photos -->
+<div class="modal cachee" id="popup-cf-photos">
+  <div class="modal-box">
+    <h3>🗑️ Supprimer ces photos ?</h3>
+    <p class="small" id="cf-photos-texte"></p>
+    <div class="actions" style="justify-content:center">
+      <button class="btn bordeaux" type="button" onclick="confirmerSupprPhotos()">Oui, supprimer</button>
+      <button class="btn ghost" type="button" onclick="fermerPopupCfPhotos()">Annuler</button>
     </div>
   </div>
 </div>
@@ -541,6 +568,45 @@ function confirmerSuppr(){
   fermerPopupSuppr();
   if(n)supprimer(n);
 }
+// ---- Suppression des photos sélectionnées (mot de passe + double validation) ----
+function ouvrirPopupSupprPhotos(){
+  if(!window._selPhotos.size){alert('Cochez au moins une photo à supprimer.');return;}
+  document.getElementById('mp-photos-erreur').textContent='';
+  const inp=document.getElementById('mp-photos-input');inp.value='';
+  document.getElementById('popup-mp-photos').classList.remove('cachee');
+  setTimeout(()=>inp.focus(),50);
+}
+function fermerPopupMpPhotos(){document.getElementById('popup-mp-photos').classList.add('cachee');}
+function verifierCodeSupprPhotos(){
+  const v=document.getElementById('mp-photos-input').value.trim();
+  if(v===CODE_SYNTHESE){
+    fermerPopupMpPhotos();
+    document.getElementById('cf-photos-texte').textContent='Supprimer définitivement '+window._selPhotos.size+' photo(s) ? Le fichier et sa fiche seront effacés.';
+    document.getElementById('popup-cf-photos').classList.remove('cachee');
+  }else{
+    document.getElementById('mp-photos-erreur').textContent='Code incorrect, réessayez.';
+  }
+}
+function fermerPopupCfPhotos(){document.getElementById('popup-cf-photos').classList.add('cachee');}
+async function confirmerSupprPhotos(){
+  fermerPopupCfPhotos();
+  const ids=[...window._selPhotos];
+  statutPhotos('Suppression en cours…');
+  let ok=0,sansFichier=0;
+  for(const id of ids){
+    const p=window._photos[id];
+    try{
+      if(p&&p.del){
+        try{await fetch('https://api.cloudinary.com/v1_1/'+encodeURIComponent(CONFIG.cloudinary.cloudName)+'/delete_by_token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'token='+encodeURIComponent(p.del)});}catch(e){}
+      }else if(p){sansFichier++;}
+      await fetch(urlBase()+'/photos/'+id+'.json',{method:'DELETE'});
+      window._selPhotos.delete(id);
+      ok++;
+    }catch(e){}
+  }
+  await chargerPhotos();
+  statutPhotos(ok+' photo(s) retirée(s) de la galerie.'+(sansFichier?' '+sansFichier+' ancienne(s) sans fichier lié : purgez-les si besoin depuis le tableau de bord Cloudinary (dossier manon18ans).':''));
+}
 function ouvrirPopupRaz(){document.getElementById('popup-raz').classList.remove('cachee');}
 function fermerPopupRaz(){document.getElementById('popup-raz').classList.add('cachee');}
 function confirmerRaz(){
@@ -576,6 +642,9 @@ document.getElementById('code-input').addEventListener('keydown',e=>{if(e.key===
 document.getElementById('popup-code').addEventListener('click',e=>{if(e.target.id==='popup-code')fermerPopup();});
 document.getElementById('popup-raz').addEventListener('click',e=>{if(e.target.id==='popup-raz')fermerPopupRaz();});
 document.getElementById('popup-suppr').addEventListener('click',e=>{if(e.target.id==='popup-suppr')fermerPopupSuppr();});
+document.getElementById('mp-photos-input').addEventListener('keydown',e=>{if(e.key==='Enter')verifierCodeSupprPhotos();});
+document.getElementById('popup-mp-photos').addEventListener('click',e=>{if(e.target.id==='popup-mp-photos')fermerPopupMpPhotos();});
+document.getElementById('popup-cf-photos').addEventListener('click',e=>{if(e.target.id==='popup-cf-photos')fermerPopupCfPhotos();});
 function retourAccueil(){
   document.getElementById('page-synthese').classList.add('cachee');
   document.getElementById('page-photos').classList.add('cachee');
@@ -623,7 +692,7 @@ async function uploaderPhotos(files){
     if(f.size>15*1024*1024){upStatut('« '+f.name+' » ignorée (plus de 15 Mo).');continue;}
     try{
       const up=await uploaderCloudinary(f,auteur);
-      const meta={nom:auteur,url:up.secure_url,public_id:up.public_id,date:new Date().toLocaleString('fr-FR')};
+      const meta={nom:auteur,url:up.secure_url,public_id:up.public_id,del:up.delete_token||'',date:new Date().toLocaleString('fr-FR')};
       const r=await fetch(urlBase()+'/photos.json',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(meta)});
       if(!r.ok)throw new Error('index');
       ok++;
