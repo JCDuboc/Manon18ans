@@ -98,6 +98,23 @@ code{background:#f5ecd0;padding:2px 6px;border-radius:6px}
 .modal-box h3{color:var(--bordeaux);margin:0 0 8px;font-family:'Playfair Display',serif}
 .modal-box input{margin:12px 0}
 .erreur{color:#b00020;font-size:.9rem;min-height:1.2em}
+/* Page photos partagées */
+.dropzone{border:2px dashed var(--gold-fonce);border-radius:14px;padding:26px 16px;text-align:center;background:#fffdf3;cursor:pointer;margin-top:10px}
+.dropzone.survol{background:#fff3cf;border-color:var(--bordeaux)}
+.progress{height:12px;background:#f0e2b6;border-radius:999px;overflow:hidden;margin-top:10px}
+.progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--bordeaux),var(--gold));transition:width .2s}
+.onglets{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:16px 0 6px}
+.onglet{border:2px solid var(--gold);background:white;border-radius:999px;padding:6px 16px;cursor:pointer;font-weight:600;color:var(--bordeaux);font-size:.9rem}
+.onglet.actif{background:var(--bordeaux);color:var(--gold-clair);border-color:var(--bordeaux)}
+.grille-photos{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}
+@media(max-width:750px){.grille-photos{grid-template-columns:repeat(2,1fr)}}
+.carte-photo{border:3px solid var(--gold);border-radius:12px;overflow:hidden;background:#eee}
+.carte-photo img{width:100%;height:190px;object-fit:cover;display:block;background:#f5ecd0}
+.carte-photo .legende{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 8px;font-size:.78rem;background:white}
+.carte-photo .legende b{color:var(--bordeaux);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.carte-photo .legende a{color:var(--gold-fonce);font-weight:700;text-decoration:none;white-space:nowrap}
+.carte-photo input[type=checkbox]{width:20px;height:20px;accent-color:var(--bordeaux);flex:none}
+.barre-sel{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;background:var(--creme);border:1px solid var(--gold);border-radius:12px;padding:10px;margin-top:14px;font-size:.9rem}
 .dish b.dish-title{display:block;text-transform:uppercase;letter-spacing:.5px;color:var(--bordeaux)}
 .dish span.dish-desc{display:block;font-size:.9rem;color:#6b5560;margin-top:2px}
 .dish span.dish-desc::first-letter{text-transform:uppercase}
@@ -112,6 +129,7 @@ code{background:#f5ecd0;padding:2px 6px;border-radius:6px}
   <p style="margin-top:20px">
     <a class="btn" href="#infos">Point infos</a>
     <a class="btn outline" href="#menu">Choix du menu</a>
+    <a class="btn outline" href="#" onclick="voirPhotos();return false">📸 Photos</a>
   </p>
 </header>
 
@@ -218,6 +236,34 @@ code{background:#f5ecd0;padding:2px 6px;border-radius:6px}
     <p class="small">Page réservée à l'organisateur.</p>
   </section>
 </div>
+
+<div class="page cachee" id="page-photos">
+  <!-- PAGE PHOTOS PARTAGEES -->
+  <section class="card" id="photos">
+    <h2>Photos de la Journée</h2>
+    <p style="text-align:center">Partagez vos photos de l'évènement, et récupérez celles des autres invités !</p>
+    <fieldset class="full">
+      <legend>➕ Partager mes photos</legend>
+      <select id="photo-auteur"></select>
+      <div class="dropzone" id="dropzone">Glissez vos photos ici ou <b>cliquez pour les choisir</b><input type="file" id="photo-files" accept="image/*" multiple hidden></div>
+      <div class="progress"><i id="up-bar"></i></div>
+      <p class="small" id="up-statut" style="text-align:center"></p>
+    </fieldset>
+    <div class="barre-sel">
+      <span><b id="sel-compte">0</b> sélectionnée(s)</span>
+      <button class="btn ghost" type="button" onclick="toutSelectionner()">Tout sélectionner</button>
+      <button class="btn bordeaux" type="button" onclick="telechargerSelection()">⬇️ Télécharger la sélection</button>
+      <button class="btn ghost" type="button" onclick="effacerSelection()">Effacer</button>
+    </div>
+    <div class="onglets" id="onglets"></div>
+    <div class="grille-photos" id="grille-photos"></div>
+    <p class="small" id="photos-statut" style="text-align:center"></p>
+    <div class="actions" style="justify-content:center">
+      <button class="btn ghost" type="button" onclick="chargerPhotos()">🔄 Actualiser</button>
+      <button class="btn ghost" type="button" onclick="retourAccueil()">← Retour</button>
+    </div>
+  </section>
+</div>
 </div>
 
 <!-- Popup code synthèse -->
@@ -290,7 +336,10 @@ const CONFIG = {
   // Collez ici l'URL de votre base Firebase Realtime Database, ex :
   // "https://mon-projet-default-rtdb.europe-west1.firebasedatabase.app"
   // Laisser "" = mode local uniquement.
-  backendUrl: "https://ans-manon-default-rtdb.europe-west1.firebasedatabase.app"
+  backendUrl: "https://ans-manon-default-rtdb.europe-west1.firebasedatabase.app",
+  // Photos partagées (Cloudinary + index Firebase). Compte gratuit, sans carte.
+  cloudinary: {cloudName:"z1sz7hrp", uploadPreset:"18ansManon"}
+};
 };
 // ================================================================
 
@@ -355,18 +404,22 @@ function charger(){try{return JSON.parse(localStorage.getItem(KEY))||{}}catch{re
 function sauver(d){localStorage.setItem(KEY,JSON.stringify(d))}
 function getChecked(name){const e=document.querySelector(`input[name="${name}"]:checked`);return e?e.value:''}
 
-// ---- Base centrale (Firebase Realtime Database via REST) ----
+// ---- Base centrale (Firebase Realtime Database via REST, lecture seule) ----
+// La base est verrouillée en écriture (.write: false) : les choix se consultent,
+// les nouveaux enregistrements restent locaux à l'appareil.
 function urlBase(){return (CONFIG.backendUrl||'').replace(/\/+$/,'');}
 function statut(txt){const el=document.getElementById('statut-sync');if(el)el.textContent=txt;}
 async function chargerDistant(){
   const base=urlBase();if(!base)return {};
   const r=await fetch(base+'/menus.json');
+  if(r.status===401||r.status===403)throw new Error('DROITS');
   if(!r.ok)throw new Error('Lecture distante impossible');
   return (await r.json())||{};
 }
 async function envoyerDistant(invite,obj){
   const base=urlBase();if(!base)return;
-  await fetch(base+'/menus/'+encodeURIComponent(invite)+'.json',{method:'PUT',body:JSON.stringify(obj)});
+  const r=await fetch(base+'/menus/'+encodeURIComponent(invite)+'.json',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(obj)});
+  if(!r.ok)throw new Error('Ecriture impossible (base verrouillée)');
 }
 async function supprimerDistant(invite){
   const base=urlBase();if(!base)return;
@@ -396,11 +449,12 @@ function enregistrerChoix(e){
   data[invite]={entree,plat,dessert,commentaire,date:new Date().toLocaleString('fr-FR')};
   sauver(data);
   window._toutes=data;
+  const msgEl=document.getElementById('message');
+  msgEl.textContent=`Merci ${invite} ! Ton menu a bien été enregistré ✓`;
   if(urlBase()){
-    envoyerDistant(invite,data[invite]).catch(()=>{});
-    document.getElementById('message').textContent=`Merci ${invite} ! Ton menu a bien été enregistré et centralisé ✓`;
-  } else {
-    document.getElementById('message').textContent=`Merci ${invite} ! Ton menu a bien été enregistré ✓`;
+    envoyerDistant(invite,data[invite])
+      .then(()=>{msgEl.textContent=`Merci ${invite} ! Ton menu a bien été enregistré et centralisé ✓`;})
+      .catch(()=>{msgEl.textContent=`Merci ${invite} ! Ton menu est enregistré sur cet appareil (base centrale verrouillée en écriture).`;});
   }
   document.getElementById('form-menu').reset();
   afficher();
@@ -463,7 +517,8 @@ async function afficher(){
     dessiner(m);
     statut('Centralisé ✓ — visibles depuis tous les appareils ('+Object.keys(m).length+' réponse(s)).');
   }catch(e){
-    statut('Hors-ligne : affichage des choix de cet appareil uniquement.');
+    if(e&&e.message==='DROITS')statut('Consultation impossible : la base bloque la lecture (règles Firebase).');
+    else statut('Hors-ligne : affichage des choix de cet appareil uniquement.');
   }
 }
 function supprimer(n){
@@ -524,9 +579,132 @@ document.getElementById('popup-raz').addEventListener('click',e=>{if(e.target.id
 document.getElementById('popup-suppr').addEventListener('click',e=>{if(e.target.id==='popup-suppr')fermerPopupSuppr();});
 function retourAccueil(){
   document.getElementById('page-synthese').classList.add('cachee');
+  document.getElementById('page-photos').classList.add('cachee');
   document.getElementById('page-invites').classList.remove('cachee');
   window.scrollTo({top:0,behavior:'smooth'});
 }
+
+// ================= PHOTOS PARTAGEES (Cloudinary + index RTDB) =================
+window._photos={};window._ongletPhoto='__toutes';window._selPhotos=new Set();
+async function uploaderCloudinary(f,auteur){
+  const cfg=CONFIG.cloudinary||{};
+  if(!cfg.cloudName||!cfg.uploadPreset)throw new Error('CONFIG');
+  const fd=new FormData();
+  fd.append('file',f);
+  fd.append('upload_preset',cfg.uploadPreset);
+  fd.append('folder','manon18ans/'+auteur);
+  fd.append('tags','manon18ans,'+auteur);
+  const r=await fetch('https://api.cloudinary.com/v1_1/'+encodeURIComponent(cfg.cloudName)+'/image/upload',{method:'POST',body:fd});
+  if(!r.ok)throw new Error('CLOUDINARY');
+  return await r.json();
+}
+function peuplerAuteurs(){
+  const s=document.getElementById('photo-auteur');
+  s.innerHTML=`<option value="" disabled selected>Qui partage ces photos ?</option>`+CONFIG.invites.map(n=>`<option value="${n}">${n}</option>`).join('');
+}
+function voirPhotos(){
+  document.getElementById('page-invites').classList.add('cachee');
+  document.getElementById('page-synthese').classList.add('cachee');
+  document.getElementById('page-photos').classList.remove('cachee');
+  window.scrollTo({top:0,behavior:'smooth'});
+  peuplerAuteurs();
+  chargerPhotos();
+}
+function upStatut(t){document.getElementById('up-statut').textContent=t;}
+function upBar(p){document.getElementById('up-bar').style.width=Math.round(p*100)+'%';}
+async function uploaderPhotos(files){
+  const auteur=document.getElementById('photo-auteur').value;
+  if(!auteur){alert('Choisissez votre nom avant d’envoyer des photos.');return;}
+  const imgs=[...files].filter(f=>f.type&&f.type.startsWith('image/'));
+  if(!imgs.length){alert('Aucune image valide sélectionnée.');return;}
+  upBar(0);upStatut('Envoi en cours…');
+  let ok=0;
+  for(let i=0;i<imgs.length;i++){
+    const f=imgs[i];
+    if(f.size>15*1024*1024){upStatut('« '+f.name+' » ignorée (plus de 15 Mo).');continue;}
+    try{
+      const up=await uploaderCloudinary(f,auteur);
+      const meta={nom:auteur,url:up.secure_url,public_id:up.public_id,date:new Date().toLocaleString('fr-FR')};
+      const r=await fetch(urlBase()+'/photos.json',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(meta)});
+      if(!r.ok)throw new Error('index');
+      ok++;
+      upBar((i+1)/imgs.length);
+      upStatut('Envoi '+ok+'/'+imgs.length+'…');
+    }catch(e){upStatut('Échec pour « '+f.name+' » (connexion, preset ou droits). Poursuite…');}
+  }
+  document.getElementById('photo-files').value='';
+  upStatut(ok?ok+' photo(s) partagée(s) ✓':'Aucune photo envoyée.');
+  setTimeout(()=>{upStatut('');upBar(0);},6000);
+  chargerPhotos();
+}
+function statutPhotos(t){document.getElementById('photos-statut').textContent=t;}
+async function chargerPhotos(){
+  statutPhotos('Chargement des photos…');
+  try{
+    if(!urlBase())throw new Error('CONFIG');
+    const r=await fetch(urlBase()+'/photos.json');
+    if(!r.ok)throw new Error('HTTP');
+    window._photos=(await r.json())||{};
+    // ne garder que les onglets existants
+    const auteurs=new Set(Object.values(window._photos).map(p=>p.nom));
+    if(window._ongletPhoto!=='__toutes'&&!auteurs.has(window._ongletPhoto))window._ongletPhoto='__toutes';
+    dessinerOnglets();dessinerGalerie();
+    statutPhotos(Object.keys(window._photos).length+' photo(s) partagée(s). Cliquez sur une photo pour l’agrandir, cochez pour sélectionner.');
+  }catch(e){statutPhotos('Impossible de charger les photos (connexion ou base non configurée).');}
+}
+function dessinerOnglets(){
+  const auteurs=[...new Set(Object.values(window._photos).map(p=>p.nom))].sort((a,b)=>a.localeCompare(b,'fr'));
+  const box=document.getElementById('onglets');
+  let h=`<button class="onglet ${window._ongletPhoto==='__toutes'?'actif':''}" onclick="choisirOnglet('__toutes')">Toutes (${Object.keys(window._photos).length})</button>`;
+  h+=auteurs.map(a=>{
+    const n=Object.values(window._photos).filter(p=>p.nom===a).length;
+    return `<button class="onglet ${window._ongletPhoto===a?'actif':''}" onclick="choisirOnglet('${a.replace(/'/g,"\\'")}')">${a} (${n})</button>`;
+  }).join('');
+  box.innerHTML=h||'<span class="small">Aucune photo pour le moment.</span>';
+}
+function choisirOnglet(a){window._ongletPhoto=a;dessinerOnglets();dessinerGalerie();}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function dessinerGalerie(){
+  const g=document.getElementById('grille-photos');
+  const entrees=Object.entries(window._photos).filter(([id,p])=>window._ongletPhoto==='__toutes'||p.nom===window._ongletPhoto);
+  entrees.sort((a,b)=>String(b[1].date||'').localeCompare(String(a[1].date||'')));
+  g.innerHTML=entrees.map(([id,p])=>{
+    const coche=window._selPhotos.has(id)?'checked':'';
+    return `<div class="carte-photo">
+      <a href="${esc(p.url)}" target="_blank" rel="noopener"><img src="${esc(p.url)}" alt="Photo de ${esc(p.nom)}" loading="lazy"></a>
+      <div class="legende"><input type="checkbox" ${coche} onchange="toggleSel('${id}')" title="Sélectionner"><b>${esc(p.nom)}</b><a href="${esc(p.url)}" target="_blank" rel="noopener" download>⬇️</a></div>
+    </div>`;
+  }).join('')||'<p class="small" style="grid-column:1/-1;text-align:center">Aucune photo dans cet onglet pour le moment.</p>';
+  majBarreSel();
+}
+function toggleSel(id){if(window._selPhotos.has(id))window._selPhotos.delete(id);else window._selPhotos.add(id);majBarreSel();const g=document.getElementById('grille-photos');}
+function majBarreSel(){document.getElementById('sel-compte').textContent=window._selPhotos.size;}
+function toutSelectionner(){
+  const entrees=Object.entries(window._photos).filter(([id,p])=>window._ongletPhoto==='__toutes'||p.nom===window._ongletPhoto);
+  const tous=entrees.every(([id])=>window._selPhotos.has(id));
+  entrees.forEach(([id])=>{if(tous)window._selPhotos.delete(id);else window._selPhotos.add(id);});
+  dessinerGalerie();
+}
+function effacerSelection(){window._selPhotos.clear();dessinerGalerie();}
+function telechargerSelection(){
+  const ids=[...window._selPhotos];
+  if(!ids.length){alert('Cochez au moins une photo à télécharger.');return;}
+  alert(ids.length+' téléchargement(s) : autorisez les téléchargements multiples si le navigateur le demande.');
+  ids.forEach((id,i)=>{setTimeout(()=>{
+    const p=window._photos[id];if(!p||!p.url)return;
+    const a=document.createElement('a');a.href=p.url;a.target='_blank';a.rel='noopener';a.download='photo-'+id+'.jpg';
+    document.body.appendChild(a);a.click();a.remove();
+  },i*700);});
+}
+// Zone de dépôt : clic + glisser-déposer
+(function(){
+  const dz=document.getElementById('dropzone'),inp=document.getElementById('photo-files');
+  dz.addEventListener('click',()=>inp.click());
+  inp.addEventListener('change',()=>{uploaderPhotos(inp.files);});
+  ['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('survol');}));
+  ['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('survol');}));
+  dz.addEventListener('drop',e=>{if(e.dataTransfer&&e.dataTransfer.files.length)uploaderPhotos(e.dataTransfer.files);});
+})();
 function exporterCSV(){
   const d=window._toutes||charger();const rows=[['Invite','Entree','Plat','Dessert','Commentaire','Date']];
   for(const n in d)rows.push([n,d[n].entree,d[n].plat,d[n].dessert,(d[n].commentaire||'').replace(/;/g,','),d[n].date||'']);
