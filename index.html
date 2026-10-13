@@ -127,8 +127,8 @@ code{background:#f5ecd0;padding:2px 6px;border-radius:6px}
   <p class="script">18 ans</p>
   <h1><span class="gold" id="prenom-titre">Manon</span></h1>
   <p style="margin-top:20px">
-    <a class="btn" href="#infos">Point infos</a>
-    <a class="btn outline" href="#menu">Choix du menu</a>
+    <a class="btn" href="#infos" onclick="allerSection('infos');return false">Point infos</a>
+    <a class="btn outline" href="#menu" onclick="allerSection('menu');return false">Choix du menu</a>
     <!-- Pour déverrouiller la page photos/vidéos : remettre onclick="voirPhotos();return false" -->
     <a class="btn outline" href="#" onclick="ouvrirPopupPhotos();return false">📸 Photos/Vidéos</a>
   </p>
@@ -262,8 +262,6 @@ code{background:#f5ecd0;padding:2px 6px;border-radius:6px}
     <div class="actions" style="justify-content:center">
       <button class="btn ghost" type="button" onclick="chargerPhotos()">🔄 Actualiser</button>
       <button class="btn ghost" type="button" onclick="ouvrirPopupSupprPhotos()">🗑️ Supprimer la sélection</button>
-      <button class="btn ghost" type="button" onclick="allerSection('infos')">Point infos</button>
-      <button class="btn ghost" type="button" onclick="allerSection('menu')">Choix du menu</button>
       <button class="btn ghost" type="button" onclick="retourAccueil()">← Retour</button>
     </div>
   </section>
