@@ -109,7 +109,7 @@ code{background:#f5ecd0;padding:2px 6px;border-radius:6px}
 .grille-photos{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}
 @media(max-width:750px){.grille-photos{grid-template-columns:repeat(2,1fr)}}
 .carte-photo{border:3px solid var(--gold);border-radius:12px;overflow:hidden;background:#eee}
-.carte-photo img{width:100%;height:190px;object-fit:cover;display:block;background:#f5ecd0}
+.carte-photo img,.carte-photo video{width:100%;height:190px;object-fit:cover;display:block;background:#2b1114}
 .carte-photo .legende{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 8px;font-size:.78rem;background:white}
 .carte-photo .legende b{color:var(--bordeaux);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .carte-photo .legende a{color:var(--gold-fonce);font-weight:700;text-decoration:none;white-space:nowrap}
@@ -240,12 +240,12 @@ code{background:#f5ecd0;padding:2px 6px;border-radius:6px}
 <div class="page cachee" id="page-photos">
   <!-- PAGE PHOTOS PARTAGEES -->
   <section class="card" id="photos">
-    <h2>Photos de la Journée</h2>
-    <p style="text-align:center">Partagez vos photos de l'évènement, et récupérez celles des autres invités !</p>
+    <h2>Photos et Vidéos de la Journée</h2>
+    <p style="text-align:center">Partagez vos photos et vidéos de l'évènement, et récupérez celles des autres invités !</p>
     <fieldset class="full">
-      <legend>➕ Partager mes photos</legend>
+      <legend>➕ Partager mes photos et vidéos</legend>
       <select id="photo-auteur"></select>
-      <div class="dropzone" id="dropzone">Glissez vos photos ici ou <b>cliquez pour les choisir</b><input type="file" id="photo-files" accept="image/*" multiple hidden></div>
+      <div class="dropzone" id="dropzone">Glissez vos photos et vidéos ici ou <b>cliquez pour les choisir</b><input type="file" id="photo-files" accept="image/*,video/*" multiple hidden></div>
       <div class="progress"><i id="up-bar"></i></div>
       <p class="small" id="up-statut" style="text-align:center"></p>
     </fieldset>
@@ -662,7 +662,7 @@ async function uploaderCloudinary(f,auteur){
   fd.append('upload_preset',cfg.uploadPreset);
   fd.append('folder','manon18ans/'+auteur);
   fd.append('tags','manon18ans,'+auteur);
-  const r=await fetch('https://api.cloudinary.com/v1_1/'+encodeURIComponent(cfg.cloudName)+'/image/upload',{method:'POST',body:fd});
+  const r=await fetch('https://api.cloudinary.com/v1_1/'+encodeURIComponent(cfg.cloudName)+'/auto/upload',{method:'POST',body:fd});
   if(!r.ok)throw new Error('CLOUDINARY');
   return await r.json();
 }
@@ -682,26 +682,28 @@ function upStatut(t){document.getElementById('up-statut').textContent=t;}
 function upBar(p){document.getElementById('up-bar').style.width=Math.round(p*100)+'%';}
 async function uploaderPhotos(files){
   const auteur=document.getElementById('photo-auteur').value;
-  if(!auteur){alert('Choisissez votre nom avant d’envoyer des photos.');return;}
-  const imgs=[...files].filter(f=>f.type&&f.type.startsWith('image/'));
-  if(!imgs.length){alert('Aucune image valide sélectionnée.');return;}
+  if(!auteur){alert('Choisissez votre nom avant d’envoyer vos fichiers.');return;}
+  const medias=[...files].filter(f=>f.type&&(f.type.startsWith('image/')||f.type.startsWith('video/')));
+  if(!medias.length){alert('Aucune image ou vidéo valide sélectionnée.');return;}
   upBar(0);upStatut('Envoi en cours…');
   let ok=0;
-  for(let i=0;i<imgs.length;i++){
-    const f=imgs[i];
-    if(f.size>15*1024*1024){upStatut('« '+f.name+' » ignorée (plus de 15 Mo).');continue;}
+  for(let i=0;i<medias.length;i++){
+    const f=medias[i];
+    const estVideo=f.type.startsWith('video/');
+    const limite=estVideo?100*1024*1024:15*1024*1024;
+    if(f.size>limite){upStatut('« '+f.name+' » ignoré (trop lourd : '+(estVideo?'100 Mo max':'15 Mo max')+').');continue;}
     try{
       const up=await uploaderCloudinary(f,auteur);
-      const meta={nom:auteur,url:up.secure_url,public_id:up.public_id,del:up.delete_token||'',date:new Date().toLocaleString('fr-FR')};
+      const meta={nom:auteur,url:up.secure_url,public_id:up.public_id,type:up.resource_type||(estVideo?'video':'image'),del:up.delete_token||'',date:new Date().toLocaleString('fr-FR')};
       const r=await fetch(urlBase()+'/photos.json',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(meta)});
       if(!r.ok)throw new Error('index');
       ok++;
-      upBar((i+1)/imgs.length);
-      upStatut('Envoi '+ok+'/'+imgs.length+'…');
+      upBar((i+1)/medias.length);
+      upStatut('Envoi '+ok+'/'+medias.length+'…');
     }catch(e){upStatut('Échec pour « '+f.name+' » (connexion, preset ou droits). Poursuite…');}
   }
   document.getElementById('photo-files').value='';
-  upStatut(ok?ok+' photo(s) partagée(s) ✓':'Aucune photo envoyée.');
+  upStatut(ok?ok+' fichier(s) partagé(s) ✓':'Aucun fichier envoyé.');
   setTimeout(()=>{upStatut('');upBar(0);},6000);
   chargerPhotos();
 }
@@ -728,7 +730,7 @@ function dessinerOnglets(){
     const n=Object.values(window._photos).filter(p=>p.nom===a).length;
     return `<button class="onglet ${window._ongletPhoto===a?'actif':''}" onclick="choisirOnglet('${a.replace(/'/g,"\\'")}')">${a} (${n})</button>`;
   }).join('');
-  box.innerHTML=h||'<span class="small">Aucune photo pour le moment.</span>';
+  box.innerHTML=h||'<span class="small">Aucun partage pour le moment.</span>';
 }
 function choisirOnglet(a){window._ongletPhoto=a;dessinerOnglets();dessinerGalerie();}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -738,11 +740,15 @@ function dessinerGalerie(){
   entrees.sort((a,b)=>String(b[1].date||'').localeCompare(String(a[1].date||'')));
   g.innerHTML=entrees.map(([id,p])=>{
     const coche=window._selPhotos.has(id)?'checked':'';
+    const estVideo=p.type==='video';
+    const media=estVideo
+      ?`<video src="${esc(p.url)}" controls preload="metadata" playsinline></video>`
+      :`<a href="${esc(p.url)}" target="_blank" rel="noopener"><img src="${esc(p.url)}" alt="Photo de ${esc(p.nom)}" loading="lazy"></a>`;
     return `<div class="carte-photo">
-      <a href="${esc(p.url)}" target="_blank" rel="noopener"><img src="${esc(p.url)}" alt="Photo de ${esc(p.nom)}" loading="lazy"></a>
-      <div class="legende"><input type="checkbox" ${coche} onchange="toggleSel('${id}')" title="Sélectionner"><b>${esc(p.nom)}</b><a href="#" onclick="telechargerUnePhoto('${id}');return false;" title="Télécharger">⬇️</a></div>
+      ${media}
+      <div class="legende"><input type="checkbox" ${coche} onchange="toggleSel('${id}')" title="Sélectionner"><b>${estVideo?'🎬 ':''}${esc(p.nom)}</b><a href="#" onclick="telechargerUnePhoto('${id}');return false;" title="Télécharger">⬇️</a></div>
     </div>`;
-  }).join('')||'<p class="small" style="grid-column:1/-1;text-align:center">Aucune photo dans cet onglet pour le moment.</p>';
+  }).join('')||'<p class="small" style="grid-column:1/-1;text-align:center">Aucune photo ni vidéo dans cet onglet pour le moment.</p>';
   majBarreSel();
 }
 function toggleSel(id){if(window._selPhotos.has(id))window._selPhotos.delete(id);else window._selPhotos.add(id);majBarreSel();const g=document.getElementById('grille-photos');}
@@ -754,7 +760,7 @@ function toutSelectionner(){
   dessinerGalerie();
 }
 function effacerSelection(){window._selPhotos.clear();dessinerGalerie();}
-function nomFichier(p,i){return 'photo-'+String(p.nom||'invite').replace(/[^\w\-àâäéèêëîïôöùûüç]+/gi,'_')+'-'+(i+1)+'.jpg';}
+function nomFichier(p,i){const ext=(p&&p.type==='video')?'.mp4':'.jpg';return 'photo-'+String(p.nom||'invite').replace(/[^\w\-àâäéèêëîïôöùûüç]+/gi,'_')+'-'+(i+1)+ext;}
 async function telechargerBlob(p,nom){
   const r=await fetch(p.url,{mode:'cors'});
   if(!r.ok)throw new Error('HTTP');
@@ -771,7 +777,7 @@ async function telechargerUnePhoto(id){
 }
 function telechargerSelection(){
   const ids=[...window._selPhotos];
-  if(!ids.length){alert('Cochez au moins une photo à télécharger.');return;}
+  if(!ids.length){alert('Cochez au moins une photo ou vidéo à télécharger.');return;}
   alert(ids.length+' téléchargement(s) : autorisez les téléchargements multiples si le navigateur le demande.');
   (async()=>{
     let ok=0,ko=0;
