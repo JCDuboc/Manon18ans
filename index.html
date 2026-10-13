@@ -129,7 +129,8 @@ code{background:#f5ecd0;padding:2px 6px;border-radius:6px}
   <p style="margin-top:20px">
     <a class="btn" href="#infos">Point infos</a>
     <a class="btn outline" href="#menu">Choix du menu</a>
-    <a class="btn outline" href="#" onclick="voirPhotos();return false">📸 Photos</a>
+    <!-- Pour déverrouiller la page photos/vidéos : remettre onclick="voirPhotos();return false" -->
+    <a class="btn outline" href="#" onclick="ouvrirPopupPhotos();return false">📸 Photos/Vidéos</a>
   </p>
 </header>
 
@@ -261,6 +262,8 @@ code{background:#f5ecd0;padding:2px 6px;border-radius:6px}
     <div class="actions" style="justify-content:center">
       <button class="btn ghost" type="button" onclick="chargerPhotos()">🔄 Actualiser</button>
       <button class="btn ghost" type="button" onclick="ouvrirPopupSupprPhotos()">🗑️ Supprimer la sélection</button>
+      <button class="btn ghost" type="button" onclick="allerSection('infos')">Point infos</button>
+      <button class="btn ghost" type="button" onclick="allerSection('menu')">Choix du menu</button>
       <button class="btn ghost" type="button" onclick="retourAccueil()">← Retour</button>
     </div>
   </section>
@@ -270,7 +273,7 @@ code{background:#f5ecd0;padding:2px 6px;border-radius:6px}
 <!-- Popup code synthèse -->
 <div class="modal cachee" id="popup-code">
   <div class="modal-box">
-    <h3>🔒 Accès Synthèse</h3>
+    <h3 id="popup-code-titre">🔒 Accès Synthèse</h3>
     <p class="small">Veuillez saisir le code organisateur.</p>
     <input type="password" id="code-input" placeholder="Code" autocomplete="off">
     <p class="erreur" id="code-erreur"></p>
@@ -619,7 +622,20 @@ function confirmerRaz(){
 }
 function reinitialiserChoix(){ouvrirPopupRaz();}
 const CODE_SYNTHESE = "Crumble";
+const CODE_PHOTOS = "Darius";
+window._destination='synthese';
 function ouvrirPopupSynthese(){
+  window._destination='synthese';
+  document.getElementById('popup-code-titre').textContent='🔒 Accès Synthèse';
+  document.getElementById('popup-code').classList.remove('cachee');
+  document.getElementById('code-erreur').textContent='';
+  const inp=document.getElementById('code-input');inp.value='';
+  setTimeout(()=>inp.focus(),50);
+}
+// Pour déverrouiller la page photos/vidéos : appeler voirPhotos() directement
+function ouvrirPopupPhotos(){
+  window._destination='photos';
+  document.getElementById('popup-code-titre').textContent='🔒 Accès Photos/Vidéos';
   document.getElementById('popup-code').classList.remove('cachee');
   document.getElementById('code-erreur').textContent='';
   const inp=document.getElementById('code-input');inp.value='';
@@ -628,12 +644,17 @@ function ouvrirPopupSynthese(){
 function fermerPopup(){document.getElementById('popup-code').classList.add('cachee');}
 function verifierCode(){
   const v=document.getElementById('code-input').value.trim();
-  if(v===CODE_SYNTHESE){
+  const attendu=(window._destination==='photos')?CODE_PHOTOS:CODE_SYNTHESE;
+  if(v===attendu){
     fermerPopup();
-    afficher();
-    document.getElementById('page-invites').classList.add('cachee');
-    document.getElementById('page-synthese').classList.remove('cachee');
-    window.scrollTo({top:0,behavior:'smooth'});
+    if(window._destination==='photos'){
+      voirPhotos();
+    }else{
+      afficher();
+      document.getElementById('page-invites').classList.add('cachee');
+      document.getElementById('page-synthese').classList.remove('cachee');
+      window.scrollTo({top:0,behavior:'smooth'});
+    }
   } else {
     document.getElementById('code-erreur').textContent='Code incorrect, réessayez.';
   }
@@ -650,6 +671,12 @@ function retourAccueil(){
   document.getElementById('page-photos').classList.add('cachee');
   document.getElementById('page-invites').classList.remove('cachee');
   window.scrollTo({top:0,behavior:'smooth'});
+}
+function allerSection(id){
+  document.getElementById('page-photos').classList.add('cachee');
+  document.getElementById('page-synthese').classList.add('cachee');
+  document.getElementById('page-invites').classList.remove('cachee');
+  setTimeout(()=>{const el=document.getElementById(id);if(el)el.scrollIntoView({behavior:'smooth'});},60);
 }
 
 // ================= PHOTOS PARTAGEES (Cloudinary + index RTDB) =================
