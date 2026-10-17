@@ -22,7 +22,7 @@ body{margin:0;font-family:'Montserrat',sans-serif;background:var(--blanc);color:
 header.hero{
   position:relative;
   background:url('fond-17102026.jpg') center top/cover no-repeat;
-  color:white;text-align:center;padding:60px 20px 70px;overflow:hidden;
+  color:white;text-align:center;padding:120px 20px 140px;overflow:hidden;
 }
 header.hero::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(74,10,18,.30),rgba(74,10,18,.55));z-index:0}
 header.hero>*{position:relative;z-index:1}
@@ -96,7 +96,7 @@ footer{background:var(--bordeaux-fonce);color:#f7e6b0;text-align:center;padding:
     <span><b id="sel-compte">0</b> sélectionnée(s)</span>
     <button class="btn ghost" type="button" onclick="toutSelectionner()">Tout sélectionner</button>
     <button class="btn bordeaux" type="button" onclick="telechargerSelection()">⬇️ Télécharger la sélection</button>
-    <button class="btn ghost" type="button" onclick="effacerSelection()">Effacer</button>
+    <button class="btn ghost" type="button" onclick="effacerSelection()">Effacer la sélection</button>
   </div>
 
   <div class="onglets" id="onglets"></div>
@@ -214,7 +214,7 @@ async function uploaderCloudinary(f,auteur){
 function peuplerAuteurs(){
   const s=document.getElementById('photo-auteur');
   if(s.options.length)return;
-  s.innerHTML=`<option value="" disabled selected>Qui partage ces photos ?</option>`+CONFIG.invites.map(n=>`<option value="${n}">${n}</option>`).join('');
+  s.innerHTML=`<option value="" disabled selected>Qui partage ces fichiers ?</option>`+CONFIG.invites.map(n=>`<option value="${n}">${n}</option>`).join('');
 }
 function upStatut(t){document.getElementById('up-statut').textContent=t;}
 function upBar(p){document.getElementById('up-bar').style.width=Math.round(p*100)+'%';}
