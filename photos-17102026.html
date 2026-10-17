@@ -357,7 +357,7 @@ function ouvrirPopupSupprPhotos(){
 function fermerPopupMpPhotos(){document.getElementById('popup-mp-photos').classList.add('cachee');}
 function verifierCodeSupprPhotos(){
   const v=document.getElementById('mp-photos-input').value.trim();
-  if(v===CODE_ACCES){
+  if(v==="Crumble"){
     fermerPopupMpPhotos();
     document.getElementById('cf-photos-texte').textContent='Supprimer définitivement '+window._selPhotos.size+' photo(s) ? Le fichier et sa fiche seront effacés.';
     document.getElementById('popup-cf-photos').classList.remove('cachee');
