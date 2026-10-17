@@ -250,7 +250,7 @@ async function uploaderPhotos(files){
     try{
       const up=await uploaderCloudinary(f,auteur);
       const meta={nom:auteur,url:up.secure_url,public_id:up.public_id,type:up.resource_type||(estVideo?'video':'image'),del:up.delete_token||'',date:new Date().toLocaleString('fr-FR')};
-      const r=await fetch(urlBase()+'/photos.json'+branchePhotos(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(meta)});
+      const r=await fetch(urlBase()+branchePhotos()+'.json',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(meta)});
       if(!r.ok)throw new Error('index');
       ok++;
       upBar((i+1)/medias.length);
