@@ -719,7 +719,7 @@ async function uploaderPhotos(files){
     if(f.size>limite){upStatut('« '+f.name+' » ignoré (trop lourd : '+(estVideo?'100 Mo max':'15 Mo max')+').');continue;}
     try{
       const up=await uploaderCloudinary(f,auteur);
-      const meta={nom:auteur,url:up.secure_url,public_id:up.public_id,type:up.resource_type||(estVideo?'video':'image'),del:up.delete_token||'',date:new Date().toLocaleString('fr-FR')};
+      const meta={nom:auteur,url:up.secure_url,public_id:up.public_id,type:up.resource_type||(estVideo?'video':'image'),del:up.delete_token||'',fich:f.name||'',date:new Date().toLocaleString('fr-FR')};
       const r=await fetch(urlBase()+'/photos.json',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(meta)});
       if(!r.ok)throw new Error('index');
       ok++;
@@ -785,7 +785,21 @@ function toutSelectionner(){
   dessinerGalerie();
 }
 function effacerSelection(){window._selPhotos.clear();dessinerGalerie();}
-function nomFichier(p,i){const ext=(p&&p.type==='video')?'.mp4':'.jpg';return 'photo-'+String(p.nom||'invite').replace(/[^\w\-àâäéèêëîïôöùûüç]+/gi,'_')+'-'+(i+1)+ext;}
+function nettoyerNom(s){return String(s==null?'':s).replace(/[\\/:*?"<>|]+/g,'_').trim();}
+function nomFichier(p,i){
+  const ext=(p&&p.type==='video')?'.mp4':'.jpg';
+  const a=nettoyerNom(p&&p.nom||'invite');
+  if(p&&p.fich){return a+'-'+nettoyerNom(p.fich);}
+  const d=String(p&&p.date||'').replace(/\D/g,'');
+  return 'photo-'+a+"-"+(d||'indetermine')+'-'+(i+1)+ext;
+}
+function nomSansDoublon(nom,utilises){
+  if(!utilises[nom]){utilises[nom]=1;return nom;}
+  const m=nom.match(/^(.*?)(\.[^.]+)$/);
+  let n=2;const base=m?m[1]:nom,ext=m?m[2]:'';
+  while(utilises[base+'-'+n+ext])n++;
+  const r=base+'-'+n+ext;utilises[r]=1;return r;
+}
 async function telechargerBlob(p,nom){
   const r=await fetch(p.url,{mode:'cors'});
   if(!r.ok)throw new Error('HTTP');
@@ -805,11 +819,11 @@ function telechargerSelection(){
   if(!ids.length){alert('Cochez au moins une photo ou vidéo à télécharger.');return;}
   alert(ids.length+' téléchargement(s) : autorisez les téléchargements multiples si le navigateur le demande.');
   (async()=>{
-    let ok=0,ko=0;
+    let ok=0,ko=0;const utilises={};
     for(let i=0;i<ids.length;i++){
       const p=window._photos[ids[i]];
       if(p&&p.url){
-        try{await telechargerBlob(p,nomFichier(p,i));ok++;}
+        try{await telechargerBlob(p,nomSansDoublon(nomFichier(p,i),utilises));ok++;}
         catch(e){window.open(p.url,'_blank');ko++;}
       }else{ko++;}
       await new Promise(r=>setTimeout(r,600));
