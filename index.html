@@ -797,7 +797,7 @@ function dessinerGalerie(){
   }).join('')||'<p class="small" style="grid-column:1/-1;text-align:center">Aucune photo ni vidéo dans cet onglet pour le moment.</p>';
   majBarreSel();
 }
-function toggleSel(id){if(window._selPhotos.has(id))window._selPhotos.delete(id);else window._selPhotos.add(id);majBarreSel();const g=document.getElementById('grille-photos');}
+function toggleSel(id){if(window._selPhotos.has(id))window._selPhotos.delete(id);else window._selPhotos.add(id);dessinerGalerie();}
 function majBarreSel(){document.getElementById('sel-compte').textContent=window._selPhotos.size;}
 function toutSelectionner(){
   const entrees=Object.entries(window._photos).filter(([id,p])=>window._ongletPhoto==='__toutes'||p.nom===window._ongletPhoto);
