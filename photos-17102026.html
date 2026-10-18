@@ -70,6 +70,18 @@ footer{background:var(--bordeaux-fonce);color:#f7e6b0;text-align:center;padding:
 .carte-photo .legende a{color:var(--gold-fonce);font-weight:700;text-decoration:none;white-space:nowrap}
 .carte-photo input[type=checkbox]{width:20px;height:20px;accent-color:var(--bordeaux);flex:none}
 .barre-sel{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;background:var(--creme);border:1px solid var(--gold);border-radius:12px;padding:10px;margin-top:14px;font-size:.9rem}
+/* Visionneuse plein écran */
+.lightbox{position:fixed;inset:0;background:rgba(30,5,8,.92);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;padding:20px;z-index:1000}
+.lightbox.cachee{display:none}
+.lightbox .media img{max-width:92vw;max-height:76vh;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.6);display:block}
+.lightbox .media video{max-width:92vw;max-height:76vh;border-radius:12px;display:block}
+.lb-fleche{position:fixed;top:50%;transform:translateY(-50%);width:54px;height:54px;border-radius:50%;border:2px solid var(--gold);background:rgba(255,255,255,.08);color:#fff;font-size:1.5rem;cursor:pointer;z-index:1001}
+.lb-fleche:hover{background:var(--gold);color:#4a0a12}
+.lb-g{left:16px}.lb-d{right:16px}
+.lb-fermer{position:fixed;top:14px;right:14px;width:46px;height:46px;border-radius:50%;border:2px solid var(--gold);background:rgba(255,255,255,.08);color:#fff;font-size:1.3rem;cursor:pointer;z-index:1001}
+.lb-fermer:hover{background:#b00020;border-color:#b00020}
+.lb-legende{color:var(--gold-clair);font-size:.95rem;text-align:center;max-width:80vw;margin:0}
+.media-clic{cursor:zoom-in}
 </style>
 </head>
 <body>
@@ -148,6 +160,15 @@ footer{background:var(--bordeaux-fonce);color:#f7e6b0;text-align:center;padding:
       <button class="btn ghost" type="button" onclick="fermerPopupCfPhotos()">Annuler</button>
     </div>
   </div>
+</div>
+
+<!-- Visionneuse plein écran -->
+<div class="lightbox cachee" id="lightbox">
+  <button class="lb-fleche lb-g" type="button" onclick="bougerVisionneuse(-1)" title="Précédente">◀</button>
+  <div class="media" id="lb-media"></div>
+  <p class="lb-legende" id="lb-legende"></p>
+  <button class="lb-fleche lb-d" type="button" onclick="bougerVisionneuse(1)" title="Suivante">▶</button>
+  <button class="lb-fermer" type="button" onclick="fermerVisionneuse()" title="Fermer">✕</button>
 </div>
 
 <footer>
@@ -280,10 +301,10 @@ function dessinerGalerie(){
     const estVideo=p.type==='video';
     const media=estVideo
       ?`<video src="${esc(p.url)}" controls preload="metadata" playsinline></video>`
-      :`<a href="${esc(p.url)}" target="_blank" rel="noopener"><img src="${esc(p.url)}" alt="Photo de ${esc(p.nom)}" loading="lazy"></a>`;
+      :`<div class="media-clic" onclick="ouvrirVisionneuse('${id}')" title="Cliquez pour agrandir"><img src="${esc(p.url)}" alt="Photo de ${esc(p.nom)}" loading="lazy"></div>`;
     return `<div class="carte-photo">
       ${media}
-      <div class="legende"><input type="checkbox" ${coche} onchange="toggleSel('${id}')" title="Sélectionner"><b>${estVideo?'🎬 ':''}${esc(p.nom)}</b><a href="#" onclick="telechargerUnePhoto('${id}');return false;" title="Télécharger">⬇️</a></div>
+      <div class="legende"><input type="checkbox" ${coche} onchange="toggleSel('${id}')" title="Sélectionner"><b>${estVideo?'🎬 ':''}${esc(p.nom)}</b><a href="#" onclick="ouvrirVisionneuse('${id}');return false;" title="Agrandir">🔍</a><a href="#" onclick="telechargerUnePhoto('${id}');return false;" title="Télécharger">⬇️</a></div>
     </div>`;
   }).join('')||'<p class="small" style="grid-column:1/-1;text-align:center">Aucune photo ni vidéo dans cet onglet pour le moment.</p>';
   majBarreSel();
@@ -385,6 +406,44 @@ async function confirmerSupprPhotos(){
 document.getElementById('mp-photos-input').addEventListener('keydown',e=>{if(e.key==='Enter')verifierCodeSupprPhotos();});
 document.getElementById('popup-mp-photos').addEventListener('click',e=>{if(e.target.id==='popup-mp-photos')fermerPopupMpPhotos();});
 document.getElementById('popup-cf-photos').addEventListener('click',e=>{if(e.target.id==='popup-cf-photos')fermerPopupCfPhotos();});
+// ---------- Visionneuse plein écran ----------
+window._lbListe=[];window._lbPos=0;
+function listeCourante(){
+  const e=Object.entries(window._photos).filter(([id,p])=>window._ongletPhoto==='__toutes'||p.nom===window._ongletPhoto);
+  e.sort((a,b)=>String(b[1].date||'').localeCompare(String(a[1].date||'')));
+  return e;
+}
+function ouvrirVisionneuse(id){
+  window._lbListe=listeCourante();
+  const pos=window._lbListe.findIndex(x=>x[0]===id);
+  window._lbPos=pos<0?0:pos;
+  document.getElementById('lightbox').classList.remove('cachee');
+  afficherVisionneuse();
+}
+function afficherVisionneuse(){
+  const L=window._lbListe;
+  if(!L.length){fermerVisionneuse();return;}
+  if(window._lbPos>=L.length)window._lbPos=0;
+  if(window._lbPos<0)window._lbPos=L.length-1;
+  const [,p]=L[window._lbPos];
+  const m=document.getElementById('lb-media');
+  m.innerHTML=(p.type==='video')
+    ?`<video src="${esc(p.url)}" controls autoplay playsinline></video>`
+    :`<img src="${esc(p.url)}" alt="Photo de ${esc(p.nom)}">`;
+  document.getElementById('lb-legende').textContent=`${p.type==='video'?'🎬 ':''}${p.nom||''}  —  ${window._lbPos+1} / ${L.length}`;
+}
+function bougerVisionneuse(d){window._lbPos+=d;afficherVisionneuse();}
+function fermerVisionneuse(){
+  document.getElementById('lb-media').innerHTML='';
+  document.getElementById('lightbox').classList.add('cachee');
+}
+document.addEventListener('keydown',e=>{
+  if(document.getElementById('lightbox').classList.contains('cachee'))return;
+  if(e.key==='ArrowLeft')bougerVisionneuse(-1);
+  else if(e.key==='ArrowRight')bougerVisionneuse(1);
+  else if(e.key==='Escape')fermerVisionneuse();
+});
+document.getElementById('lightbox').addEventListener('click',e=>{if(e.target.id==='lightbox')fermerVisionneuse();});
 // Zone de dépôt : clic + glisser-déposer
 (function(){
   const dz=document.getElementById('dropzone'),inp=document.getElementById('photo-files');
