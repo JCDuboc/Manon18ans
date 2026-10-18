@@ -21,16 +21,14 @@
 body{margin:0;font-family:'Montserrat',sans-serif;background:var(--blanc);color:var(--texte);line-height:1.6}
 header.hero{
   position:relative;
-  background:linear-gradient(180deg,var(--bordeaux-fonce) 0%,var(--bordeaux) 55%,var(--bordeaux-clair) 100%);
-  color:white;text-align:center;padding:0 20px 60px;overflow:hidden;
+  background:url('fond-17102026.jpg') center top/cover no-repeat;
+  color:white;text-align:center;min-height:1012px;display:flex;flex-direction:column;justify-content:space-between;align-items:center;padding:24px 20px;overflow:hidden;
 }
-.balloon-arch{position:relative;height:210px;max-width:900px;margin:0 auto}
-.balloon{position:absolute;border-radius:50% 50% 50% 50%/55% 55% 45% 45%;box-shadow:inset -6px -8px 12px rgba(0,0,0,.25), 0 6px 12px rgba(0,0,0,.3)}
-.balloon::after{content:'';position:absolute;left:50%;bottom:-14px;width:2px;height:14px;background:rgba(255,255,255,.6);transform:translateX(-50%)}
-.shine{position:absolute;left:22%;top:18%;width:14px;height:22px;background:rgba(255,255,255,.55);border-radius:50%;transform:rotate(-20deg)}
+header.hero::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(74,10,18,.30),rgba(74,10,18,.55));z-index:0}
+header.hero>*{position:relative;z-index:1}
 .hero h1{font-family:'Playfair Display',serif;font-size:clamp(2.2rem,6vw,4.2rem);margin:10px 0 0}
 .hero h1 .gold{background:linear-gradient(180deg,#fff3b0,var(--gold) 60%,#8a6a14);-webkit-background-clip:text;background-clip:text;color:transparent}
-.script{font-family:'Great Vibes',cursive;font-size:clamp(2rem,5vw,3.2rem);color:var(--gold-clair);margin:0}
+.script{font-family:'Great Vibes',cursive;font-size:clamp(2.6rem,7vw,4.5rem);color:var(--gold-clair);margin:0;text-shadow:0 2px 14px rgba(74,10,18,.7);line-height:1.25}
 .badge{display:inline-block;border:1px solid var(--gold);color:var(--gold-clair);border-radius:999px;padding:8px 22px;letter-spacing:2px;text-transform:uppercase;font-size:.8rem;margin-top:12px}
 .hero p.sous{max-width:640px;margin:14px auto 0;color:#ffeecd}
 .btn{display:inline-block;background:linear-gradient(180deg,var(--gold-clair),var(--gold));color:#4a0a12;font-weight:700;border:none;border-radius:999px;padding:13px 30px;cursor:pointer;text-decoration:none;box-shadow:0 6px 18px rgba(0,0,0,.25);transition:.2s}
@@ -135,10 +133,10 @@ code{background:#f5ecd0;padding:2px 6px;border-radius:6px}
 <body>
 
 <header class="hero">
-  <div class="balloon-arch" id="arche"></div>
-  <p class="script">18 ans</p>
-  <h1><span class="gold" id="prenom-titre">Manon</span></h1>
-  <p style="margin-top:20px">
+  <p class="script">18 ans de Manon</p>
+  <div style="flex:1"></div>
+  <p class="script">25 octobre 2026</p>
+  <p style="margin-top:10px">
     <a class="btn" href="#infos" onclick="allerSection('infos');return false">Point infos</a>
     <a class="btn outline" href="#menu" onclick="allerSection('menu');return false">Choix du menu</a>
     <!-- Pour déverrouiller la page photos/vidéos : remettre onclick="voirPhotos();return false" -->
@@ -266,7 +264,7 @@ code{background:#f5ecd0;padding:2px 6px;border-radius:6px}
       <span><b id="sel-compte">0</b> sélectionnée(s)</span>
       <button class="btn ghost" type="button" onclick="toutSelectionner()">Tout sélectionner</button>
       <button class="btn bordeaux" type="button" onclick="telechargerSelection()">⬇️ Télécharger la sélection</button>
-      <button class="btn ghost" type="button" onclick="effacerSelection()">Effacer</button>
+      <button class="btn ghost" type="button" onclick="effacerSelection()">Effacer la sélection</button>
     </div>
     <div class="onglets" id="onglets"></div>
     <div class="grille-photos" id="grille-photos"></div>
@@ -391,29 +389,12 @@ const CONFIG = {
 };
 // ================================================================
 
-document.getElementById('prenom-titre').textContent = CONFIG.prenom;
 document.getElementById('prenom-footer').textContent = CONFIG.prenom;
 document.getElementById('date-evenement').textContent = CONFIG.dateTexte;
 document.getElementById('adresse-resto').innerHTML = CONFIG.adresse;
 document.getElementById('lien-maps').href = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(CONFIG.mapsQuery);
 
-// Arche de ballons doré / bordeaux / blanc
-(function(){
-  const arch = document.getElementById('arche');
-  const couleurs = ['#6b0f1a','#d4af37','#ffffff','#8e1e2c','#f3d67c','#fffdf8','#a8811f'];
-  const n = 25;
-  for(let i=0;i<n;i++){
-    const t = i/(n-1);
-    const x = 5 + t*90; // %
-    const y = Math.sin(t*Math.PI)*-140 + 130; // arche
-    const size = 34 + Math.sin(t*Math.PI*3)*6;
-    const b = document.createElement('div');
-    b.className='balloon';
-    b.style.cssText = `left:${x}%;top:${y}px;width:${size}px;height:${size+8}px;background:${couleurs[i%couleurs.length]};z-index:${i}`;
-    b.innerHTML='<div class="shine"></div>';
-    arch.appendChild(b);
-  }
-})();
+// Arche de ballons supprimée (fond photo identique à la page Photos/Vidéos 17102026)
 
 // Compte à rebours chrono J/H/M/S
 setInterval(()=>{
@@ -714,7 +695,7 @@ async function uploaderCloudinary(f,auteur){
 }
 function peuplerAuteurs(){
   const s=document.getElementById('photo-auteur');
-  s.innerHTML=`<option value="" disabled selected>Qui partage ces photos ?</option>`+CONFIG.invites.map(n=>`<option value="${n}">${n}</option>`).join('');
+  s.innerHTML=`<option value="" disabled selected>Qui partage ces fichiers ?</option>`+CONFIG.invites.map(n=>`<option value="${n}">${n}</option>`).join('');
 }
 function voirPhotos(){
   document.getElementById('page-invites').classList.add('cachee');
