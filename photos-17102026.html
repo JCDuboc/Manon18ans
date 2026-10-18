@@ -362,6 +362,7 @@ function telechargerSelection(){
       await new Promise(r=>setTimeout(r,600));
     }
     statutPhotos(ok+' photo(s) téléchargée(s)'+(ko?' — '+ko+' ouverte(s) dans un onglet (enregistrez-les via clic droit).':'')+'.');
+    effacerSelection();
   })();
 }
 // ---------- Suppression ----------
