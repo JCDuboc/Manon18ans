@@ -871,12 +871,12 @@ function afficherVisionneuse(){
   if(!L.length){fermerVisionneuse();return;}
   if(window._lbPos>=L.length)window._lbPos=0;
   if(window._lbPos<0)window._lbPos=L.length-1;
-  const [,p]=L[window._lbPos];
+  const [id,p]=L[window._lbPos];
   const m=document.getElementById('lb-media');
   m.innerHTML=(p.type==='video')
     ?`<video src="${esc(p.url)}" controls autoplay playsinline></video>`
     :`<img src="${esc(p.url)}" alt="Photo de ${esc(p.nom)}">`;
-  document.getElementById('lb-legende').textContent=`${p.type==='video'?'🎬 ':''}${p.nom||''}  —  ${window._lbPos+1} / ${L.length}`;
+  document.getElementById('lb-legende').innerHTML=`<label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-family:'Montserrat',sans-serif"><input type="checkbox" ${window._selPhotos.has(id)?'checked':''} onchange="toggleSel('${id}')" style="width:18px;height:18px;cursor:pointer"> Sélectionner pour télécharger</label><br>${(p.type==='video')?'🎬 ':''}${esc(p.nom||'')}  —  ${window._lbPos+1} / ${L.length}`;
 }
 function bougerVisionneuse(d){window._lbPos+=d;afficherVisionneuse();}
 function fermerVisionneuse(){
