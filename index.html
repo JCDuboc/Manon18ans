@@ -385,7 +385,14 @@ const CONFIG = {
   // Laisser "" = mode local uniquement.
   backendUrl: "https://ans-manon-default-rtdb.europe-west1.firebasedatabase.app",
   // Photos partagées (Cloudinary + index Firebase). Compte gratuit, sans carte.
-  cloudinary: {cloudName:"z1sz7hrp", uploadPreset:"18ansManon"}
+  cloudinary: {cloudName:"z1sz7hrp", uploadPreset:"18ansManon"},
+  // Stockage R2 (Cloudflare) — voir worker-r2.js. Renseignez worker et secret
+  // pour basculer les nouveaux envois sur R2 (l'ancien Cloudinary reste lisible).
+  r2: {
+    worker: "https://manon18ans-medias.jcduboc.workers.dev",
+    secret: "Manon-18-ans-R2-2026!",
+    prefix: "manon18ans"
+  }
 };
 // ================================================================
 
@@ -599,7 +606,9 @@ async function confirmerSupprPhotos(){
   for(const id of ids){
     const p=window._photos[id];
     try{
-      if(p&&p.del){
+      if(p&&p.key&&r2Actif()){
+        try{await fetch(CONFIG.r2.worker.replace(/\/+$/,'')+'/delete',{method:'POST',headers:{'X-Secret':CONFIG.r2.secret,'Content-Type':'application/json'},body:JSON.stringify({keys:[p.key]})});}catch(e){}
+      }else if(p&&p.del){
         try{await fetch('https://api.cloudinary.com/v1_1/'+encodeURIComponent(CONFIG.cloudinary.cloudName)+'/delete_by_token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'token='+encodeURIComponent(p.del)});}catch(e){}
       }else if(p){sansFichier++;}
       await fetch(urlBase()+'/photos/'+id+'.json',{method:'DELETE'});
@@ -679,8 +688,17 @@ function allerSection(id){
   setTimeout(()=>{const el=document.getElementById(id);if(el)el.scrollIntoView({behavior:'smooth'});},60);
 }
 
-// ================= PHOTOS PARTAGEES (Cloudinary + index RTDB) =================
+// ================= PHOTOS PARTAGEES (Cloudinary/R2 + index RTDB) =================
 window._photos={};window._ongletPhoto='__toutes';window._selPhotos=new Set();
+function r2Actif(){return !!(CONFIG.r2&&CONFIG.r2.worker&&CONFIG.r2.secret);}
+async function uploaderR2(f,auteur){
+  const r2=CONFIG.r2, base=r2.worker.replace(/\/+$/,'');
+  const nomPropre=String(f.name||'fichier').replace(/[\\/:*?"<>|]+/g,'_');
+  const key=r2.prefix+'/'+auteur+'/'+Date.now()+'-'+nomPropre;
+  const r=await fetch(base+'/upload?key='+encodeURIComponent(key),{method:'POST',headers:{'X-Secret':r2.secret,'Content-Type':f.type||'application/octet-stream'},body:f});
+  if(!r.ok)throw new Error('R2');
+  return {key:key,url:base+'/f/'+encodeURIComponent(key)};
+}
 async function uploaderCloudinary(f,auteur){
   const cfg=CONFIG.cloudinary||{};
   if(!cfg.cloudName||!cfg.uploadPreset)throw new Error('CONFIG');
@@ -720,8 +738,14 @@ async function uploaderPhotos(files){
     const limite=estVideo?100*1024*1024:15*1024*1024;
     if(f.size>limite){upStatut('« '+f.name+' » ignoré (trop lourd : '+(estVideo?'100 Mo max':'15 Mo max')+').');continue;}
     try{
-      const up=await uploaderCloudinary(f,auteur);
-      const meta={nom:auteur,url:up.secure_url,public_id:up.public_id,type:up.resource_type||(estVideo?'video':'image'),del:up.delete_token||'',fich:f.name||'',date:new Date().toLocaleString('fr-FR')};
+      let meta;
+      if(r2Actif()){
+        const up=await uploaderR2(f,auteur);
+        meta={nom:auteur,url:up.url,public_id:'',key:up.key,type:estVideo?'video':'image',del:'',fich:f.name||'',date:new Date().toLocaleString('fr-FR')};
+      }else{
+        const up=await uploaderCloudinary(f,auteur);
+        meta={nom:auteur,url:up.secure_url,public_id:up.public_id,type:up.resource_type||(estVideo?'video':'image'),del:up.delete_token||'',fich:f.name||'',date:new Date().toLocaleString('fr-FR')};
+      }
       const r=await fetch(urlBase()+'/photos.json',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(meta)});
       if(!r.ok)throw new Error('index');
       ok++;
