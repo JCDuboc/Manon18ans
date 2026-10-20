@@ -738,11 +738,14 @@ async function uploaderPhotos(files){
     const limite=estVideo?100*1024*1024:15*1024*1024;
     if(f.size>limite){upStatut('« '+f.name+' » ignoré (trop lourd : '+(estVideo?'100 Mo max':'15 Mo max')+').');continue;}
     try{
-      let meta;
+      let meta=null;
       if(r2Actif()){
-        const up=await uploaderR2(f,auteur);
-        meta={nom:auteur,url:up.url,public_id:'',key:up.key,type:estVideo?'video':'image',del:'',fich:f.name||'',date:new Date().toLocaleString('fr-FR')};
-      }else{
+        try{
+          const up=await uploaderR2(f,auteur);
+          meta={nom:auteur,url:up.url,public_id:'',key:up.key,type:estVideo?'video':'image',del:'',fich:f.name||'',date:new Date().toLocaleString('fr-FR')};
+        }catch(e2){}
+      }
+      if(!meta){
         const up=await uploaderCloudinary(f,auteur);
         meta={nom:auteur,url:up.secure_url,public_id:up.public_id,type:up.resource_type||(estVideo?'video':'image'),del:up.delete_token||'',fich:f.name||'',date:new Date().toLocaleString('fr-FR')};
       }
