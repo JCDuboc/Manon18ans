@@ -607,7 +607,7 @@ async function confirmerSupprPhotos(){
     const p=window._photos[id];
     try{
       if(p&&p.key&&r2Actif()){
-        try{await fetch(CONFIG.r2.worker.replace(/\/+$/,'')+'/delete',{method:'POST',headers:{'X-Secret':CONFIG.r2.secret,'Content-Type':'application/json'},body:JSON.stringify({keys:[p.key]})});}catch(e){}
+        try{await fetch(CONFIG.r2.worker.replace(/\/+$/,'')+'/delete?s='+encodeURIComponent(CONFIG.r2.secret),{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({keys:[p.key]})});}catch(e){}
       }else if(p&&p.del){
         try{await fetch('https://api.cloudinary.com/v1_1/'+encodeURIComponent(CONFIG.cloudinary.cloudName)+'/delete_by_token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'token='+encodeURIComponent(p.del)});}catch(e){}
       }else if(p){sansFichier++;}
@@ -695,7 +695,7 @@ async function uploaderR2(f,auteur){
   const r2=CONFIG.r2, base=r2.worker.replace(/\/+$/,'');
   const nomPropre=String(f.name||'fichier').replace(/[\\/:*?"<>|]+/g,'_');
   const key=r2.prefix+'/'+auteur+'/'+Date.now()+'-'+nomPropre;
-  const r=await fetch(base+'/upload?key='+encodeURIComponent(key),{method:'POST',headers:{'X-Secret':r2.secret,'Content-Type':f.type||'application/octet-stream'},body:f});
+  const r=await fetch(base+'/upload?key='+encodeURIComponent(key)+'&type='+encodeURIComponent(f.type||'application/octet-stream')+'&s='+encodeURIComponent(r2.secret),{method:'POST',headers:{'Content-Type':'text/plain'},body:f});
   if(!r.ok)throw new Error('R2');
   return {key:key,url:base+'/f/'+encodeURIComponent(key)};
 }
